@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useReducer } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import useWebSocket from "../hooks/useWebSocket";
 
 // ── theme ─────────────────────────────────────────────────────────────────────
 const T = {
@@ -21,63 +22,6 @@ const T = {
   muted:   "#8b949e",
   dim:     "#484f58",
 };
-
-// ── scene state (simulated UE5 world) ────────────────────────────────────────
-const initScene = {
-  actors: [
-    { id: "a1", name: "DirectionalLight_1", type: "DirectionalLight", x: 0,    y: 0,   z: 500, scale: 1, color: "#fffbe6", visible: true },
-    { id: "a2", name: "SkyLight_1",          type: "SkyLight",        x: 0,    y: 0,   z: 0,   scale: 1, color: "#b4d9ff", visible: true },
-    { id: "a3", name: "PlayerStart_1",       type: "PlayerStart",     x: -200, y: 0,   z: 100, scale: 1, color: "#78ff8c", visible: true },
-  ],
-  nextId: 4,
-  levelName: "Untitled",
-  playing: false,
-};
-
-function sceneReducer(state, action) {
-  switch (action.type) {
-    case "SPAWN": {
-      const count = action.count || 1;
-      const circle = action.layout === "circle";
-      const r = action.radius || 300;
-      const shape = action.shape || "Cube";
-      const newActors = Array.from({ length: count }, (_, i) => ({
-        id: `a${state.nextId + i}`,
-        name: `${shape}Actor_${state.nextId + i}`,
-        type: "StaticMeshActor",
-        shape,
-        x: circle ? Math.round(Math.cos(i * 2 * Math.PI / count) * r) : i * 150,
-        y: circle ? Math.round(Math.sin(i * 2 * Math.PI / count) * r) : 0,
-        z: action.z || 0,
-        scale: 1,
-        color: action.color || "#58a6ff",
-        visible: true,
-        material: action.material || null,
-      }));
-      return { ...state, actors: [...state.actors, ...newActors], nextId: state.nextId + count };
-    }
-    case "DELETE":
-      return { ...state, actors: state.actors.filter(a => !action.ids.includes(a.id)) };
-    case "MOVE":
-      return { ...state, actors: state.actors.map(a => a.name === action.name ? { ...a, x: action.x ?? a.x, y: action.y ?? a.y, z: action.z ?? a.z } : a) };
-    case "SCALE":
-      return { ...state, actors: state.actors.map(a => a.name === action.name ? { ...a, scale: action.scale } : a) };
-    case "MATERIAL":
-      return { ...state, actors: state.actors.map(a => a.name === action.name || action.all ? { ...a, material: action.material, color: action.color || a.color } : a) };
-    case "TOGGLE_VIS":
-      return { ...state, actors: state.actors.map(a => a.id === action.id ? { ...a, visible: !a.visible } : a) };
-    case "SELECT":
-      return { ...state, selected: action.id };
-    case "PLAY":
-      return { ...state, playing: true };
-    case "STOP":
-      return { ...state, playing: false };
-    case "CLEAR_MESH":
-      return { ...state, actors: state.actors.filter(a => a.type !== "StaticMeshActor") };
-    default:
-      return state;
-  }
-}
 
 // ── tool catalogue ────────────────────────────────────────────────────────────
 const TOOLS = [
@@ -104,145 +48,12 @@ const TOOLS = [
   ]},
 ];
 
-// ── shape picker colors ───────────────────────────────────────────────────────
-const SHAPE_COLORS = {
-  Cube:     "#58a6ff",
-  Sphere:   "#bc8cff",
-  Cylinder: "#39d3c3",
-  Cone:     "#f0883e",
-  Plane:    "#3fb950",
-};
-
-const MAT_COLORS = {
-  M_Emissive_Blue:  "#58a6ff",
-  M_Metal_Gold:     "#f0c040",
-  M_Emissive_Red:   "#f85149",
-  M_Glass:          "#a8d8ff",
-  M_Concrete:       "#888",
-  M_Basic_Surface:  "#c8c8c8",
-};
-
-// ── command parser ────────────────────────────────────────────────────────────
-function classify(p) {
-  const l = p.toLowerCase();
-  if (/stop.*play|stop.*pie|end.*play/i.test(l)) return "stop";
-  if (/spawn|place|add.*mesh|create.*actor/i.test(l)) return "spawn";
-  if (/list|show.*actor|get.*actor|query|what.*actor/i.test(l)) return "list";
-  if (/move|teleport|set.*loc|relocate/i.test(l)) return "move";
-  if (/scale|resize/i.test(l)) return "scale";
-  if (/delete|remove|destroy|clear/i.test(l)) return "delete";
-  if (/blueprint|bp_/i.test(l)) return "blueprint";
-  if (/material|texture|emissive|metal|glass|concret/i.test(l)) return "material";
-  if (/color|colour/i.test(l)) return "color";
-  if (/level|world|scene info|setting/i.test(l)) return "level";
-  if (/play|start.*edit|pie/i.test(l)) return "play";
-  if (/screenshot|capture/i.test(l)) return "screenshot";
-  return "default";
-}
-
-function parseCommand(type, prompt, scene) {
-  const match = (re) => (prompt.match(re) || [])[1];
-  const nums = prompt.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
-
-  switch (type) {
-    case "spawn": {
-      const count = nums[0] && nums[0] < 20 ? Math.round(nums[0]) : 1;
-      const shape = /sphere/i.test(prompt) ? "Sphere" : /cylinder/i.test(prompt) ? "Cylinder" : /cone/i.test(prompt) ? "Cone" : /plane/i.test(prompt) ? "Plane" : "Cube";
-      const circle = /circle|ring/i.test(prompt);
-      const radius = nums.find(n => n > 10) || 300;
-      const z = nums.find(n => n >= 0 && n !== count && n !== radius) ?? 0;
-      const colorName = /red/i.test(prompt) ? "#f85149" : /green/i.test(prompt) ? "#3fb950" : /blue/i.test(prompt) ? "#58a6ff" : /gold|yellow/i.test(prompt) ? "#f0c040" : /orange/i.test(prompt) ? "#f0883e" : SHAPE_COLORS[shape];
-      return { cmd: { type: "SPAWN", count, shape, layout: circle ? "circle" : "linear", radius, z, color: colorName }, lines: [
-        { k: "info",    v: `→ spawn_actor  ·  ${shape}  ·  count=${count}  ·  ${circle ? `circle r=${radius}` : `z=${z}`}` },
-        { k: "json",    v: JSON.stringify({ tool: "spawn_actor", params: { asset: `/Engine/BasicShapes/${shape}.${shape}`, count, layout: circle ? "circle" : "linear", color: colorName, z } }, null, 2) },
-        { k: "success", v: `✓  spawned ${count} ${shape.toLowerCase()}(s) on game thread — scene updated →` },
-      ]};
-    }
-    case "list": return { cmd: null, lines: [
-      { k: "info",    v: "→ list_actors  ·  scope: current_level" },
-      { k: "json",    v: JSON.stringify({ tool: "list_actors", params: { filter: "all" } }, null, 2) },
-      { k: "success", v: `✓  found ${scene.actors.length} actors in "${scene.levelName}"` },
-      { k: "json",    v: JSON.stringify({ actors: scene.actors.map(a => ({ name: a.name, type: a.type, location: { x: a.x, y: a.y, z: a.z } })) }, null, 2) },
-    ]};
-    case "move": {
-      const name = match(/move\s+([\w_]+)/i) || scene.actors.find(a => a.type === "StaticMeshActor")?.name || "CubeActor_4";
-      const [x, y, z] = [nums[0] ?? 200, nums[1] ?? 100, nums[2] ?? 0];
-      return { cmd: { type: "MOVE", name, x, y, z }, lines: [
-        { k: "info",    v: `→ move_actor  ·  actor: ${name}  ·  target: (${x}, ${y}, ${z})` },
-        { k: "json",    v: JSON.stringify({ tool: "move_actor", params: { actor_name: name, location: { x, y, z } } }, null, 2) },
-        { k: "success", v: `✓  ${name} moved → scene updated` },
-      ]};
-    }
-    case "scale": {
-      const name = match(/scale\s+([\w_]+)/i) || scene.actors.find(a => a.type === "StaticMeshActor")?.name || "CubeActor_4";
-      const s = nums[0] || 2;
-      return { cmd: { type: "SCALE", name, scale: s }, lines: [
-        { k: "info",    v: `→ scale_actor  ·  actor: ${name}  ·  scale: ${s}x` },
-        { k: "json",    v: JSON.stringify({ tool: "scale_actor", params: { actor_name: name, scale: s } }, null, 2) },
-        { k: "success", v: `✓  ${name} scaled to ${s}x → scene updated` },
-      ]};
-    }
-    case "delete": {
-      const all = /all/i.test(prompt);
-      const ids = all ? scene.actors.filter(a => a.type === "StaticMeshActor").map(a => a.id) : scene.actors.filter(a => a.type === "StaticMeshActor").slice(0, 1).map(a => a.id);
-      return { cmd: { type: "DELETE", ids }, lines: [
-        { k: "warn",    v: `⚠  delete_actor  ·  targets: ${ids.length} actor(s)  ·  safety read done` },
-        { k: "json",    v: JSON.stringify({ tool: "delete_actor", params: { filter: all ? "StaticMeshActor" : "selected", count: ids.length } }, null, 2) },
-        { k: "success", v: `✓  deleted ${ids.length} actor(s) → scene updated` },
-      ]};
-    }
-    case "blueprint": {
-      const name = match(/\b(BP_\w+)\b/) || match(/(?:named|called)\s+(\w+)/i) || "BP_NewClass";
-      const parent = match(/inherit\w*\s+(?:from\s+)?(\w+)/i) || "Actor";
-      return { cmd: null, lines: [
-        { k: "info",    v: `→ create_blueprint  ·  class: ${name}  ·  parent: ${parent}` },
-        { k: "json",    v: JSON.stringify({ tool: "create_blueprint", params: { class_name: name, parent_class: parent, path: "/Game/Blueprints/" } }, null, 2) },
-        { k: "success", v: `✓  ${name} created at /Game/Blueprints/${name}` },
-        { k: "plain",   v: "FKismetEditorUtilities::CreateBlueprint() · asset registered in Content Browser" },
-      ]};
-    }
-    case "material":
-    case "color": {
-      const matName = /gold|metal/i.test(prompt) ? "M_Metal_Gold" : /red/i.test(prompt) ? "M_Emissive_Red" : /glass/i.test(prompt) ? "M_Glass" : /concrete/i.test(prompt) ? "M_Concrete" : "M_Emissive_Blue";
-      const col = MAT_COLORS[matName] || "#58a6ff";
-      const all = /all/i.test(prompt);
-      const target = match(/to\s+([\w_]+)/i) || scene.actors.find(a => a.type === "StaticMeshActor")?.name || "selected";
-      return { cmd: { type: "MATERIAL", name: target, all, material: matName, color: col }, lines: [
-        { k: "info",    v: `→ set_material  ·  mat: ${matName}  ·  target: ${all ? "all meshes" : target}` },
-        { k: "json",    v: JSON.stringify({ tool: "set_material", params: { actor: all ? "*" : target, material_path: `/Game/Materials/${matName}.${matName}` } }, null, 2) },
-        { k: "success", v: `✓  material applied  ·  shader compiled → scene updated` },
-      ]};
-    }
-    case "level": return { cmd: null, lines: [
-      { k: "info",    v: "→ get_level_info  ·  scope: world_settings" },
-      { k: "json",    v: JSON.stringify({ tool: "get_level_info", params: {} }, null, 2) },
-      { k: "success", v: "✓  level info retrieved" },
-      { k: "json",    v: JSON.stringify({ level_name: scene.levelName, actor_count: scene.actors.length, game_mode: "BP_GameMode_C", gravity: -980, time_dilation: 1.0, playing: scene.playing }, null, 2) },
-    ]};
-    case "play": return { cmd: { type: "PLAY" }, lines: [
-      { k: "info",    v: "→ play_level  ·  mode: PIE" },
-      { k: "json",    v: JSON.stringify({ tool: "play_level", params: { mode: "PIE" } }, null, 2) },
-      { k: "success", v: "✓  play-in-editor started  ·  game thread running" },
-    ]};
-    case "stop": return { cmd: { type: "STOP" }, lines: [
-      { k: "info",    v: "→ stop_level  ·  end PIE" },
-      { k: "success", v: "✓  PIE session ended" },
-    ]};
-    case "screenshot": return { cmd: null, lines: [
-      { k: "info",    v: "→ take_screenshot  ·  viewport: active" },
-      { k: "success", v: "✓  saved to /Saved/Screenshots/Screenshot_001.png" },
-    ]};
-    default: return { cmd: null, lines: [
-      { k: "warn",    v: `⚠  could not parse: "${prompt.slice(0, 40)}"` },
-      { k: "plain",   v: 'try: "spawn 5 cubes in a circle", "move CubeActor_4 to (200,100,0)", "apply gold material"' },
-    ]};
-  }
-}
-
 // ── viewport (top-down 2D scene view) ────────────────────────────────────────
-function Viewport({ scene, dispatch }) {
+function Viewport({ scene, onSceneAction }) {
   const W = 340, H = 220;
   const toScreen = (x, y) => ({ sx: W / 2 + x * 0.18, sy: H / 2 - y * 0.18 });
+
+  const selectActor = (id) => onSceneAction({ type: "SELECT", id });
 
   const shapeSymbol = (a) => {
     const { sx, sy } = toScreen(a.x, a.y);
@@ -251,13 +62,13 @@ function Viewport({ scene, dispatch }) {
     const selected = scene.selected === a.id;
     const col = a.color || "#58a6ff";
     if (a.shape === "Sphere") return (
-      <g key={a.id} onClick={() => dispatch({ type: "SELECT", id: a.id })} style={{ cursor: "pointer" }}>
+      <g key={a.id} onClick={() => selectActor(a.id)} style={{ cursor: "pointer" }}>
         {selected && <circle cx={sx} cy={sy} r={s + 3} fill="none" stroke="#fff" strokeWidth={1} strokeDasharray="3 2" opacity={.6} />}
         <circle cx={sx} cy={sy} r={s} fill={col} opacity={opacity} />
       </g>
     );
     if (a.shape === "Cylinder") return (
-      <g key={a.id} onClick={() => dispatch({ type: "SELECT", id: a.id })} style={{ cursor: "pointer" }}>
+      <g key={a.id} onClick={() => selectActor(a.id)} style={{ cursor: "pointer" }}>
         {selected && <ellipse cx={sx} cy={sy} rx={s + 3} ry={s * .55 + 3} fill="none" stroke="#fff" strokeWidth={1} strokeDasharray="3 2" opacity={.6} />}
         <ellipse cx={sx} cy={sy} rx={s} ry={s * .55} fill={col} opacity={opacity} />
       </g>
@@ -278,7 +89,7 @@ function Viewport({ scene, dispatch }) {
     );
     // default: square (Cube, Plane, generic)
     return (
-      <g key={a.id} onClick={() => dispatch({ type: "SELECT", id: a.id })} style={{ cursor: "pointer" }}>
+      <g key={a.id} onClick={() => selectActor(a.id)} style={{ cursor: "pointer" }}>
         {selected && <rect x={sx - s - 3} y={sy - s - 3} width={(s + 3) * 2} height={(s + 3) * 2} fill="none" stroke="#fff" strokeWidth={1} strokeDasharray="3 2" opacity={.6} />}
         <rect x={sx - s} y={sy - s} width={s * 2} height={s * 2} fill={col} opacity={opacity} />
       </g>
@@ -292,17 +103,14 @@ function Viewport({ scene, dispatch }) {
         <span style={{ color: scene.playing ? T.green : T.dim }}>{scene.playing ? "● PIE running" : "○ editor"}</span>
       </div>
       <svg width={W} height={H} style={{ display: "block" }}>
-        {/* grid */}
         {Array.from({ length: 9 }, (_, i) => (
           <line key={`h${i}`} x1={0} y1={i * H / 8} x2={W} y2={i * H / 8} stroke={T.border} strokeWidth={.4} />
         ))}
         {Array.from({ length: 13 }, (_, i) => (
           <line key={`v${i}`} x1={i * W / 12} y1={0} x2={i * W / 12} y2={H} stroke={T.border} strokeWidth={.4} />
         ))}
-        {/* origin cross */}
         <line x1={W/2 - 8} y1={H/2} x2={W/2 + 8} y2={H/2} stroke={T.dim} strokeWidth={.8} />
         <line x1={W/2} y1={H/2 - 8} x2={W/2} y2={H/2 + 8} stroke={T.dim} strokeWidth={.8} />
-        {/* actors */}
         {scene.actors.map(a => shapeSymbol(a))}
       </svg>
     </div>
@@ -310,7 +118,7 @@ function Viewport({ scene, dispatch }) {
 }
 
 // ── scene inspector panel ─────────────────────────────────────────────────────
-function Inspector({ scene, dispatch }) {
+function Inspector({ scene, onSceneAction }) {
   const sel = scene.actors.find(a => a.id === scene.selected);
   return (
     <div style={{ border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", flex: 1 }}>
@@ -321,7 +129,7 @@ function Inspector({ scene, dispatch }) {
         {scene.actors.map(a => (
           <div
             key={a.id}
-            onClick={() => dispatch({ type: "SELECT", id: a.id })}
+            onClick={() => onSceneAction({ type: "SELECT", id: a.id })}
             style={{
               display: "flex", alignItems: "center", gap: 7, padding: "5px 10px",
               cursor: "pointer", borderBottom: `1px solid ${T.border}`,
@@ -333,7 +141,7 @@ function Inspector({ scene, dispatch }) {
             <span style={{ flex: 1, color: T.txt, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
             <span style={{ color: T.dim, fontSize: 10 }}>{a.type.replace("StaticMeshActor", a.shape || "Mesh")}</span>
             <span
-              onClick={e => { e.stopPropagation(); dispatch({ type: "TOGGLE_VIS", id: a.id }); }}
+              onClick={e => { e.stopPropagation(); onSceneAction({ type: "TOGGLE_VIS", id: a.id }); }}
               style={{ color: a.visible ? T.green : T.dim, fontSize: 10, cursor: "pointer", userSelect: "none" }}
             >{a.visible ? "👁" : "○"}</span>
           </div>
@@ -404,12 +212,30 @@ function Stat({ label, value, color }) {
   );
 }
 
+// ── connection status colors ──────────────────────────────────────────────────
+const STATUS_CONFIG = {
+  connected:    { color: T.green,  label: "connected",    dot: "●", anim: "pulse 2s infinite" },
+  connecting:   { color: T.amber,  label: "connecting",   dot: "◐", anim: "pulse 1s infinite" },
+  reconnecting: { color: T.amber,  label: "reconnecting", dot: "◐", anim: "pulse 0.8s infinite" },
+  disconnected: { color: T.red,    label: "disconnected", dot: "○", anim: "none" },
+};
+
+// ── default scene (used before server sends initial sync) ─────────────────────
+const EMPTY_SCENE = {
+  actors: [],
+  nextId: 1,
+  levelName: "...",
+  playing: false,
+};
+
 // ── main app ──────────────────────────────────────────────────────────────────
 export default function UnrealMCPTerminal() {
-  const [scene, dispatch] = useReducer(sceneReducer, initScene);
+  const { sendMessage, lastMessage, connectionStatus } = useWebSocket("ws://localhost:8000");
+
+  const [scene, setScene] = useState(EMPTY_SCENE);
   const [lines, setLines] = useState([
-    { k: "system", v: "Unreal-MCP v2.0  ·  UE5 Remote Control API  ·  Port 30020" },
-    { k: "system", v: "MCP server localhost:8000  ·  scene viewport active" },
+    { k: "system", v: "Unreal-MCP v2.0  ·  UE5 Remote Control API  ·  WebSocket" },
+    { k: "system", v: "WS server ws://localhost:8000  ·  waiting for connection..." },
     { k: "divider", v: "" },
   ]);
   const [input, setInput] = useState("");
@@ -419,34 +245,90 @@ export default function UnrealMCPTerminal() {
   const termRef = useRef(null);
   const textRef = useRef(null);
 
+  // scroll terminal on new lines
   useEffect(() => {
     if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
   }, [lines, thinking]);
 
+  // handle incoming WebSocket messages
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    if (lastMessage.type === "scene_sync") {
+      setScene(lastMessage.scene);
+    }
+
+    if (lastMessage.type === "response") {
+      setThinking(false);
+      setBusy(false);
+
+      // add response lines
+      if (lastMessage.lines) {
+        setLines(prev => [
+          ...prev,
+          ...lastMessage.lines,
+          { k: "divider", v: "" },
+        ]);
+      }
+
+      // update scene from server
+      if (lastMessage.scene) {
+        setScene(lastMessage.scene);
+      }
+
+      textRef.current?.focus();
+    }
+
+    if (lastMessage.type === "error") {
+      setThinking(false);
+      setBusy(false);
+      setLines(prev => [...prev, { k: "error", v: `⚠  Server error: ${lastMessage.message}` }, { k: "divider", v: "" }]);
+    }
+  }, [lastMessage]);
+
+  // log connection status changes
+  useEffect(() => {
+    if (connectionStatus === "connected") {
+      setLines(prev => [...prev, { k: "success", v: "✓  WebSocket connected to ws://localhost:8000" }, { k: "divider", v: "" }]);
+    } else if (connectionStatus === "reconnecting") {
+      setLines(prev => [...prev, { k: "warn", v: "⚠  WebSocket disconnected — attempting to reconnect..." }]);
+    }
+  }, [connectionStatus]);
+
   const meshCount = scene.actors.filter(a => a.type === "StaticMeshActor").length;
 
-  const run = useCallback(async (prompt) => {
+  // send command to server via WebSocket
+  const run = useCallback((prompt) => {
     const p = (prompt || input).trim();
     if (!p || busy) return;
+
+    if (connectionStatus !== "connected") {
+      setLines(prev => [...prev, { k: "error", v: "⚠  Not connected to WebSocket server" }, { k: "divider", v: "" }]);
+      return;
+    }
+
     setBusy(true);
     setInput("");
     setLines(prev => [...prev, { k: "prompt", v: p }]);
     setThinking(true);
-    await new Promise(r => setTimeout(r, 400 + Math.random() * 400));
-    setThinking(false);
 
-    const type = classify(p);
-    const { cmd, lines: newLines } = parseCommand(type, p, scene);
+    sendMessage({ type: "command", prompt: p });
+  }, [input, busy, connectionStatus, sendMessage]);
 
-    for (const l of newLines) {
-      await new Promise(r => setTimeout(r, 60));
-      setLines(prev => [...prev, l]);
+  // send scene actions (select, toggle visibility) directly via WebSocket
+  const onSceneAction = useCallback((cmd) => {
+    if (connectionStatus === "connected") {
+      sendMessage({ type: "scene_action", cmd });
     }
-    if (cmd) dispatch(cmd);
-    setLines(prev => [...prev, { k: "divider", v: "" }]);
-    setBusy(false);
-    textRef.current?.focus();
-  }, [input, busy, scene]);
+    // Also apply locally for instant feedback
+    setScene(prev => {
+      if (cmd.type === "SELECT") return { ...prev, selected: cmd.id };
+      if (cmd.type === "TOGGLE_VIS") return { ...prev, actors: prev.actors.map(a => a.id === cmd.id ? { ...a, visible: !a.visible } : a) };
+      return prev;
+    });
+  }, [connectionStatus, sendMessage]);
+
+  const statusCfg = STATUS_CONFIG[connectionStatus] || STATUS_CONFIG.disconnected;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: T.bg1, color: T.txt, fontFamily: "monospace", overflow: "hidden" }}>
@@ -469,15 +351,21 @@ export default function UnrealMCPTerminal() {
         </div>
         <div>
           <div style={{ fontSize: 12, fontWeight: 500 }}>Unreal-MCP Terminal</div>
-          <div style={{ fontSize: 9, color: T.dim }}>AI · MCP · UE5 Remote Control</div>
+          <div style={{ fontSize: 9, color: T.dim }}>AI · MCP · UE5 Remote Control · WebSocket</div>
         </div>
         <div style={{ flex: 1 }} />
         <Stat label="actors" value={scene.actors.length} color={T.cyan} />
         <Stat label="meshes" value={meshCount} color={T.purple} />
         <Stat label="status" value={scene.playing ? "PIE" : "editor"} color={scene.playing ? T.green : T.muted} />
+        {/* WebSocket connection badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: T.bg3, borderRadius: 6, border: `1px solid ${T.border}` }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.green, display: "inline-block", animation: "pulse 2s infinite" }} />
-          <span style={{ fontSize: 10, color: T.muted }}>:30020</span>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: statusCfg.color,
+            display: "inline-block",
+            animation: statusCfg.anim,
+          }} />
+          <span style={{ fontSize: 10, color: statusCfg.color }}>{statusCfg.label}</span>
         </div>
       </div>
 
@@ -522,7 +410,7 @@ export default function UnrealMCPTerminal() {
             {thinking && (
               <div style={{ display: "flex", alignItems: "center", gap: 5, color: T.dim, fontSize: 11, padding: "4px 0" }}>
                 <span style={{ color: "#388bfd" }}>MCP</span>
-                <span>routing</span>
+                <span>routing via WebSocket</span>
                 {[0, 180, 360].map(d => <span key={d} style={{ animation: `blink 1.1s ${d}ms infinite`, display: "inline-block" }}>.</span>)}
               </div>
             )}
@@ -551,14 +439,14 @@ export default function UnrealMCPTerminal() {
                   onInput={e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 90) + "px"; }}
                   disabled={busy}
                   rows={1}
-                  placeholder="describe what you want Unreal to do..."
+                  placeholder={connectionStatus === "connected" ? "describe what you want Unreal to do..." : "waiting for WebSocket connection..."}
                   style={{ flex: 1, background: "none", border: "none", outline: "none", resize: "none", fontFamily: "monospace", fontSize: 12, color: T.txt, padding: "9px 0", lineHeight: 1.5, maxHeight: 90 }}
                 />
               </div>
               <button
                 onClick={() => run()}
-                disabled={busy || !input.trim()}
-                style={{ padding: "9px 16px", background: busy ? "transparent" : "rgba(63,185,80,.1)", border: `1px solid ${busy || !input.trim() ? T.border : T.green}`, borderRadius: 7, cursor: busy || !input.trim() ? "not-allowed" : "pointer", color: busy ? T.dim : T.green, fontSize: 11, fontFamily: "monospace", height: 40, whiteSpace: "nowrap", transition: "all .2s" }}
+                disabled={busy || !input.trim() || connectionStatus !== "connected"}
+                style={{ padding: "9px 16px", background: busy ? "transparent" : "rgba(63,185,80,.1)", border: `1px solid ${busy || !input.trim() || connectionStatus !== "connected" ? T.border : T.green}`, borderRadius: 7, cursor: busy || !input.trim() || connectionStatus !== "connected" ? "not-allowed" : "pointer", color: busy ? T.dim : connectionStatus !== "connected" ? T.dim : T.green, fontSize: 11, fontFamily: "monospace", height: 40, whiteSpace: "nowrap", transition: "all .2s" }}
               >{busy ? "running…" : "run ↵"}</button>
             </div>
           </div>
@@ -568,10 +456,10 @@ export default function UnrealMCPTerminal() {
         <div style={{ width: 360, borderLeft: `1px solid ${T.border}`, background: T.bg2, display: "flex", flexDirection: "column", gap: 0, flexShrink: 0, overflow: "hidden" }}>
           <div style={{ padding: "8px 10px", borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.dim, letterSpacing: ".08em" }}>SCENE VIEW</div>
           <div style={{ padding: "8px 10px" }}>
-            <Viewport scene={scene} dispatch={dispatch} />
+            <Viewport scene={scene} onSceneAction={onSceneAction} />
           </div>
           <div style={{ padding: "0 10px 8px", flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <Inspector scene={scene} dispatch={dispatch} />
+            <Inspector scene={scene} onSceneAction={onSceneAction} />
           </div>
 
           {/* quick actions */}
