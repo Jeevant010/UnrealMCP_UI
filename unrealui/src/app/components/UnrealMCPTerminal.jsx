@@ -5,7 +5,7 @@ import useWebSocket from "../hooks/useWebSocket";
 
 // ── theme ─────────────────────────────────────────────────────────────────────
 const T = {
-  bg0:     "#080c14",
+  bg0:     "#000000ff",
   bg1:     "#0d1117",
   bg2:     "#161b22",
   bg3:     "#1c2128",
@@ -177,7 +177,7 @@ export default function UnrealMCPTerminal() {
   const BACKEND_LABELS = { groq: "Groq", ollama: "Ollama", gemini: "Gemini" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: T.bg1, color: T.txt, fontFamily: "monospace", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "93vh", background: T.bg1, color: T.txt, fontFamily: "monospace", overflow: "hidden" }}>
       <style>{`
         @keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
