@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from "react";
 export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
+  const [backend, setBackend] = useState("groq");
+  const [mode, setMode] = useState("build");
+  const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0, total: 0 });
   const ws = useRef<WebSocket | null>(null);
 
   // Connect to the Python Server when the page loads
@@ -12,7 +15,15 @@ export default function Home() {
     
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setMessages((prev) => [...prev, `[${data.type.toUpperCase()}] ${data.message}`]);
+      if (data.type === "telemetry") {
+        setTokenUsage((prev) => ({
+          input: prev.input + (data.usage?.input_tokens || 0),
+          output: prev.output + (data.usage?.output_tokens || 0),
+          total: prev.total + (data.usage?.total_tokens || 0)
+        }));
+      } else {
+        setMessages((prev) => [...prev, `[${data.type.toUpperCase()}] ${data.message}`]);
+      }
     };
 
     return () => ws.current?.close();
@@ -24,8 +35,12 @@ export default function Home() {
     // Add user message to UI
     setMessages((prev) => [...prev, `[USER] ${prompt}`]);
     
-    // Send to Python agent
-    ws.current.send(prompt);
+    // Send configuration and prompt to Python agent
+    const payload = {
+      prompt,
+      config: { backend, mode }
+    };
+    ws.current.send(JSON.stringify(payload));
     setPrompt("");
   };
 
@@ -36,8 +51,46 @@ export default function Home() {
           Unreal Engine Builder
         </h1>
         
+        {/* Controls */}
+        <div className="flex gap-4 mb-4">
+          <div className="flex flex-col flex-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Backend</label>
+            <select
+              value={backend}
+              onChange={(e) => setBackend(e.target.value)}
+              className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-colors cursor-pointer"
+            >
+              <option value="groq">Groq (Llama 3)</option>
+              <option value="ollama">Ollama (Local Models)</option>
+              <option value="gemini">Google Gemini</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col flex-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Mode</label>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+              className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm transition-colors cursor-pointer"
+            >
+              <option value="build">Live Builder (Scene Generation)</option>
+              <option value="two_phase">C++ Code Generator</option>
+              <option value="classic">Classic Tool-Calling Agent</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Token Tracker */}
+        {(tokenUsage.total > 0) && (
+          <div className="flex flex-wrap gap-4 md:gap-8 mb-4 p-4 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 shadow-sm text-sm justify-center items-center font-mono">
+            <div><span className="font-bold opacity-60 uppercase tracking-wider text-xs mr-2">Input:</span> {tokenUsage.input.toLocaleString()}</div>
+            <div><span className="font-bold opacity-60 uppercase tracking-wider text-xs mr-2">Output:</span> {tokenUsage.output.toLocaleString()}</div>
+            <div className="font-semibold text-blue-600 dark:text-blue-400"><span className="font-bold opacity-60 uppercase tracking-wider text-xs mr-2 text-inherit">Session Total:</span> {tokenUsage.total.toLocaleString()}</div>
+          </div>
+        )}
+
         {/* Chat Window */}
-        <div className="h-[60vh] border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-6 overflow-y-auto bg-white dark:bg-gray-900 shadow-sm flex flex-col gap-3">
+        <div className="h-[55vh] border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-6 overflow-y-auto bg-white dark:bg-gray-900 shadow-sm flex flex-col gap-3">
           {messages.length === 0 ? (
             <div className="text-gray-400 text-center m-auto italic">
               Connect to UE and type a prompt below...
