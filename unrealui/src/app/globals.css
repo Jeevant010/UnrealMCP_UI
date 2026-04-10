@@ -5,6 +5,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
+:root {
+  --page-bg: #0d1117;
+  --page-fg: #e6edf3;
+}
+
+html[data-theme="light"] {
+  --page-bg: #f6f8fa;
+  --page-fg: #1f2328;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -14,6 +24,6 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  background: #0d1117;
-  color: #e6edf3;
+  background: var(--page-bg);
+  color: var(--page-fg);
 }

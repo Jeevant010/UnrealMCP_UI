@@ -3,47 +3,67 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import useWebSocket from "../hooks/useWebSocket";
 
-// ── theme ─────────────────────────────────────────────────────────────────────
-const T = {
-  bg0:     "#000000ff",
-  bg1:     "#0d1117",
-  bg2:     "#161b22",
-  bg3:     "#1c2128",
-  border:  "#21262d",
-  borderB: "#30363d",
-  cyan:    "#58a6ff",
-  green:   "#3fb950",
-  amber:   "#d29922",
-  red:     "#f85149",
-  purple:  "#bc8cff",
-  teal:    "#39d3c3",
-  orange:  "#f0883e",
-  txt:     "#e6edf3",
-  muted:   "#8b949e",
-  dim:     "#484f58",
+// ── themes ────────────────────────────────────────────────────────────────────
+const THEMES = {
+  dark: {
+    bg0: "#000000ff",
+    bg1: "#0d1117",
+    bg2: "#161b22",
+    bg3: "#1c2128",
+    border: "#21262d",
+    borderB: "#30363d",
+    cyan: "#58a6ff",
+    green: "#3fb950",
+    amber: "#d29922",
+    red: "#f85149",
+    purple: "#bc8cff",
+    teal: "#39d3c3",
+    orange: "#f0883e",
+    txt: "#e6edf3",
+    muted: "#8b949e",
+    dim: "#484f58",
+  },
+  light: {
+    bg0: "#ffffff",
+    bg1: "#f6f8fa",
+    bg2: "#eef2f7",
+    bg3: "#e5ebf2",
+    border: "#c8d1dc",
+    borderB: "#aeb8c4",
+    cyan: "#0969da",
+    green: "#1a7f37",
+    amber: "#9a6700",
+    red: "#cf222e",
+    purple: "#8250df",
+    teal: "#1b7f83",
+    orange: "#bc4c00",
+    txt: "#1f2328",
+    muted: "#59636e",
+    dim: "#6e7781",
+  },
 };
 
 // ── terminal line ─────────────────────────────────────────────────────────────
-const LINE_STYLES = {
-  info:    { color: "#79c0ff", background: "rgba(56,139,253,.07)", borderLeft: `2px solid ${T.cyan}` },
-  success: { color: "#56d364", background: "rgba(63,185,80,.07)",  borderLeft: `2px solid ${T.green}` },
-  warn:    { color: "#e3b341", background: "rgba(210,153,34,.08)", borderLeft: `2px solid ${T.amber}` },
-  error:   { color: "#f85149", background: "rgba(248,81,73,.07)",  borderLeft: `2px solid ${T.red}` },
-  plain:   { color: T.muted },
-  system:  { color: T.dim, fontSize: 10 },
-};
+const getLineStyles = (palette) => ({
+  info: { color: palette.cyan, background: "rgba(56,139,253,.07)", borderLeft: `2px solid ${palette.cyan}` },
+  success: { color: palette.green, background: "rgba(63,185,80,.07)", borderLeft: `2px solid ${palette.green}` },
+  warn: { color: palette.amber, background: "rgba(210,153,34,.08)", borderLeft: `2px solid ${palette.amber}` },
+  error: { color: palette.red, background: "rgba(248,81,73,.07)", borderLeft: `2px solid ${palette.red}` },
+  plain: { color: palette.muted },
+  system: { color: palette.dim, fontSize: 10 },
+});
 
-function TermLine({ line }) {
+function TermLine({ line, palette, lineStyles }) {
   if (line.k === "prompt") return (
     <div style={{ display: "flex", gap: 8, marginBottom: 3, fontFamily: "monospace", fontSize: 12, alignItems: "flex-start" }}>
-      <span style={{ color: T.cyan, whiteSpace: "nowrap", flexShrink: 0 }}>$</span>
-      <span style={{ color: T.txt }}>{line.v}</span>
+      <span style={{ color: palette.cyan, whiteSpace: "nowrap", flexShrink: 0 }}>$</span>
+      <span style={{ color: palette.txt }}>{line.v}</span>
     </div>
   );
   if (line.k === "divider") return (
-    <div style={{ borderTop: `1px solid ${T.border}`, margin: "6px 0", opacity: .5 }} />
+    <div style={{ borderTop: `1px solid ${palette.border}`, margin: "6px 0", opacity: .5 }} />
   );
-  const s = LINE_STYLES[line.k] || {};
+  const s = lineStyles[line.k] || {};
   return (
     <div style={{ padding: "5px 9px", borderRadius: 4, marginBottom: 2, lineHeight: 1.65, fontSize: 12, fontFamily: "monospace", ...s }}>
       {line.v}
@@ -52,26 +72,37 @@ function TermLine({ line }) {
 }
 
 // ── stat badge ────────────────────────────────────────────────────────────────
-function Stat({ label, value, color }) {
+function Stat({ label, value, color, palette }) {
   return (
-    <div style={{ background: T.bg3, borderRadius: 6, padding: "6px 10px", border: `1px solid ${T.border}`, minWidth: 60, textAlign: "center" }}>
-      <div style={{ fontSize: 9, color: T.dim, fontFamily: "monospace", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 14, color: color || T.txt, fontFamily: "monospace", fontWeight: 500 }}>{value}</div>
+    <div style={{ background: palette.bg3, borderRadius: 6, padding: "6px 10px", border: `1px solid ${palette.border}`, minWidth: 60, textAlign: "center" }}>
+      <div style={{ fontSize: 9, color: palette.dim, fontFamily: "monospace", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 14, color: color || palette.txt, fontFamily: "monospace", fontWeight: 500 }}>{value}</div>
     </div>
   );
 }
 
 // ── connection status colors ──────────────────────────────────────────────────
-const STATUS_CONFIG = {
-  connected:    { color: T.green,  label: "connected",    dot: "●", anim: "pulse 2s infinite" },
-  connecting:   { color: T.amber,  label: "connecting",   dot: "◐", anim: "pulse 1s infinite" },
-  reconnecting: { color: T.amber,  label: "reconnecting", dot: "◐", anim: "pulse 0.8s infinite" },
-  disconnected: { color: T.red,    label: "disconnected", dot: "○", anim: "none" },
+const getStatusConfig = (palette) => ({
+  connected: { color: palette.green, label: "connected", dot: "●", anim: "pulse 2s infinite" },
+  connecting: { color: palette.amber, label: "connecting", dot: "◐", anim: "pulse 1s infinite" },
+  reconnecting: { color: palette.amber, label: "reconnecting", dot: "◐", anim: "pulse 0.8s infinite" },
+  disconnected: { color: palette.red, label: "disconnected", dot: "○", anim: "none" },
+});
+
+const getInitialTheme = () => {
+  if (typeof window === "undefined") return "dark";
+  const stored = window.localStorage.getItem("unrealui-theme");
+  if (stored === "dark" || stored === "light") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
 
 // ── main app ──────────────────────────────────────────────────────────────────
 export default function UnrealMCPTerminal() {
   const { sendMessage, lastMessage, connectionStatus } = useWebSocket("ws://localhost:8080/ws/chat");
+  const [theme, setTheme] = useState(getInitialTheme);
+  const T = THEMES[theme] || THEMES.dark;
+  const LINE_STYLES = getLineStyles(T);
+  const STATUS_CONFIG = getStatusConfig(T);
 
   const [lines, setLines] = useState([
     { k: "system", v: "Unreal-MCP Terminal  ·  UE5 Remote Control  ·  WebSocket → api_server.py" },
@@ -86,6 +117,11 @@ export default function UnrealMCPTerminal() {
   const [tokenUsage, setTokenUsage] = useState({ input: 0, output: 0, total: 0 });
   const termRef = useRef(null);
   const textRef = useRef(null);
+
+  useEffect(() => {
+    window.localStorage.setItem("unrealui-theme", theme);
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   // scroll terminal on new lines
   useEffect(() => {
@@ -177,7 +213,7 @@ export default function UnrealMCPTerminal() {
   const BACKEND_LABELS = { groq: "Groq", ollama: "Ollama", gemini: "Gemini" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "93vh", background: T.bg1, color: T.txt, fontFamily: "monospace", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: T.bg1, color: T.txt, fontFamily: "monospace", overflow: "hidden" }}>
       <style>{`
         @keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -198,6 +234,24 @@ export default function UnrealMCPTerminal() {
           <div style={{ fontSize: 12, fontWeight: 500 }}>Unreal-MCP Terminal</div>
           <div style={{ fontSize: 9, color: T.dim }}>AI · MCP · UE5 Remote Control · WebSocket</div>
         </div>
+        <button
+          onClick={() => setTheme(prev => (prev === "dark" ? "light" : "dark"))}
+          style={{
+            fontSize: 10,
+            color: T.txt,
+            background: T.bg3,
+            border: `1px solid ${T.borderB}`,
+            borderRadius: 6,
+            padding: "4px 10px",
+            cursor: "pointer",
+            fontFamily: "monospace",
+            whiteSpace: "nowrap",
+          }}
+          aria-label="Toggle theme"
+          title="Toggle dark/light theme"
+        >
+          {theme === "dark" ? "theme: dark" : "theme: light"}
+        </button>
         <div style={{ flex: 1 }} />
 
         {/* ── backend selector ── */}
@@ -231,15 +285,15 @@ export default function UnrealMCPTerminal() {
         {/* ── token stats ── */}
         {tokenUsage.total > 0 && (
           <>
-            <Stat label="in tokens" value={tokenUsage.input.toLocaleString()} color={T.cyan} />
-            <Stat label="out tokens" value={tokenUsage.output.toLocaleString()} color={T.purple} />
-            <Stat label="total" value={tokenUsage.total.toLocaleString()} color={T.green} />
+            <Stat label="in tokens" value={tokenUsage.input.toLocaleString()} color={T.cyan} palette={T} />
+            <Stat label="out tokens" value={tokenUsage.output.toLocaleString()} color={T.purple} palette={T} />
+            <Stat label="total" value={tokenUsage.total.toLocaleString()} color={T.green} palette={T} />
           </>
         )}
 
         {/* ── active config badge ── */}
-        <Stat label="backend" value={BACKEND_LABELS[backend] || backend} color={T.amber} />
-        <Stat label="mode" value={MODE_LABELS[mode] || mode} color={T.teal} />
+        <Stat label="backend" value={BACKEND_LABELS[backend] || backend} color={T.amber} palette={T} />
+        <Stat label="mode" value={MODE_LABELS[mode] || mode} color={T.teal} palette={T} />
 
         {/* WebSocket connection badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: T.bg3, borderRadius: 6, border: `1px solid ${T.border}` }}>
@@ -261,7 +315,7 @@ export default function UnrealMCPTerminal() {
 
           {/* terminal output */}
           <div ref={termRef} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", background: T.bg0 }}>
-            {lines.map((line, i) => <TermLine key={i} line={line} />)}
+            {lines.map((line, i) => <TermLine key={i} line={line} palette={T} lineStyles={LINE_STYLES} />)}
             {thinking && (
               <div style={{ display: "flex", alignItems: "center", gap: 5, color: T.dim, fontSize: 11, padding: "4px 0" }}>
                 <span style={{ color: "#388bfd" }}>MCP</span>
