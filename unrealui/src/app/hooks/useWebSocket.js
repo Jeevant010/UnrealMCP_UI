@@ -11,6 +11,7 @@ export default function useWebSocket(url = "ws://localhost:8080/ws/chat") {
   const retriesRef = useRef(0);
   const mountedRef = useRef(true);
   const urlRef = useRef(url);
+  const hasLoggedConnectFailureRef = useRef(false);
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -23,6 +24,7 @@ export default function useWebSocket(url = "ws://localhost:8080/ws/chat") {
       ws.onopen = () => {
         if (!mountedRef.current) return;
         retriesRef.current = 0;
+        hasLoggedConnectFailureRef.current = false;
         setConnectionStatus("connected");
         console.log("[WS] connected to", urlRef.current);
       };
@@ -46,9 +48,12 @@ export default function useWebSocket(url = "ws://localhost:8080/ws/chat") {
         setTimeout(connect, delay);
       };
 
-      ws.onerror = (err) => {
-        console.error("[WS] error", err);
-        ws.close();
+      ws.onerror = () => {
+        if (!hasLoggedConnectFailureRef.current) {
+          console.warn("[WS] connection error; retrying automatically");
+          hasLoggedConnectFailureRef.current = true;
+        }
+        // Let onclose handle reconnection scheduling to avoid duplicate logic.
       };
     } catch (err) {
       console.error("[WS] connection failed", err);

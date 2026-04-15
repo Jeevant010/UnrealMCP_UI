@@ -209,7 +209,7 @@ export default function UnrealMCPTerminal() {
   const statusCfg = STATUS_CONFIG[connectionStatus] || STATUS_CONFIG.disconnected;
 
   // Mode labels for display
-  const MODE_LABELS = { build: "Live Builder", two_phase: "C++ CodeGen", classic: "Classic Agent" };
+  const MODE_LABELS = { build: "Live Builder", two_phase: "C++ CodeGen", classic: "Classic Agent", orchestrate: "Orchestrator" };
   const BACKEND_LABELS = { groq: "Groq", ollama: "Ollama", gemini: "Gemini" };
 
   return (
@@ -278,6 +278,7 @@ export default function UnrealMCPTerminal() {
           >
             <option value="build">Live Builder</option>
             <option value="two_phase">C++ CodeGen</option>
+            <option value="orchestrate">Orchestrator</option>
             <option value="classic">Classic Agent</option>
           </select>
         </div>
