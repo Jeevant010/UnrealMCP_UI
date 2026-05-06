@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 
-const RECONNECT_DELAYS = [500, 1000, 2000, 4000, 8000];
+const RECONNECT_DELAYS = [500, 1000, 2000, 4000, 8000, 8001];
 
-export default function useWebSocket(url = "ws://localhost:8080/ws/chat") {
+export default function useWebSocket(url = "ws://localhost:8001/ws/chat") {
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [lastMessage, setLastMessage] = useState(null);
   const wsRef = useRef(null);

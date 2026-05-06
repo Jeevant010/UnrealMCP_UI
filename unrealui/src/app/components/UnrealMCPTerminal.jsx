@@ -98,7 +98,7 @@ const getInitialTheme = () => {
 
 // ── main app ──────────────────────────────────────────────────────────────────
 export default function UnrealMCPTerminal() {
-  const { sendMessage, lastMessage, connectionStatus } = useWebSocket("ws://localhost:8080/ws/chat");
+  const { sendMessage, lastMessage, connectionStatus } = useWebSocket("ws://localhost:8001/ws/chat");
   const [theme, setTheme] = useState(getInitialTheme);
   const T = THEMES[theme] || THEMES.dark;
   const LINE_STYLES = getLineStyles(T);
@@ -106,7 +106,7 @@ export default function UnrealMCPTerminal() {
 
   const [lines, setLines] = useState([
     { k: "system", v: "Unreal-MCP Terminal  ·  UE5 Remote Control  ·  WebSocket → api_server.py" },
-    { k: "system", v: "Connecting to ws://localhost:8080/ws/chat ..." },
+    { k: "system", v: "Connecting to ws://localhost:8001/ws/chat ..." },
     { k: "divider", v: "" },
   ]);
   const [input, setInput] = useState("");
