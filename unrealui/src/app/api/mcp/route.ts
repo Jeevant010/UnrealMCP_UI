@@ -40,8 +40,8 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        // The SDK returns text content inside the result.content array
-        result: result.content?.[0]?.text || "Success (No output)",
+        // Safely extract the text from the content array
+        result: (result.content as any[])?.[0]?.text || "Success (No output)",
       });
     } catch (toolError: any) {
       await client.close();
