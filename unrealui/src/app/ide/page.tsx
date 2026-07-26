@@ -113,7 +113,8 @@ export default function IDEPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: ngrokUrl,
-          script: `import unreal\n# Generated execution for: ${userPromptText}\nprint("Executed prompt: ${userPromptText}")`
+          prompt: userPromptText,
+          model: selectedModel
         })
       });
 
@@ -128,7 +129,7 @@ export default function IDEPage() {
                   text: `Successfully executed your request in Unreal Engine!`,
                   toolCall: {
                     name: "execute_python_in_editor",
-                    script: `import unreal\n# Prompt: ${userPromptText}`,
+                    script: data.executedScript || `# Prompt: ${userPromptText}`,
                     output: data.result || "Command executed in Unreal Editor successfully.",
                     status: "success"
                   }
