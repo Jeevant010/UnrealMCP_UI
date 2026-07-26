@@ -25,7 +25,7 @@ export default function DownloadPage() {
               <p className="text-gray-400">Version 1.0.0 • Requires Unreal Engine 5+</p>
             </div>
             
-            <a href="#" className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all">
+            <a href="/downloads/UnrealMCP_Relay.exe" download className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all">
               <Download className="w-5 h-5" /> Download .exe
             </a>
           </div>
