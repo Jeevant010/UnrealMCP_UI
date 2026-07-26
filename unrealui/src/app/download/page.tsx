@@ -26,7 +26,7 @@ export default function DownloadPage() {
             </div>
             
             <a 
-              href="https://github.com/your-username/Unreal-MCP/releases/latest/download/UnrealMCP_Relay-Windows-x64.zip" 
+              href="https://github.com/Deepesh70/Unreal-MCP/releases/latest/download/UnrealMCP_Relay-Windows-x64.zip" 
               target="_blank" 
               rel="noreferrer" 
               className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)]"
