@@ -25,8 +25,13 @@ export default function DownloadPage() {
               <p className="text-gray-400">Version 1.0.0 • Requires Unreal Engine 5+</p>
             </div>
             
-            <a href="/downloads/UnrealMCP_Relay.exe" download className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all">
-              <Download className="w-5 h-5" /> Download .exe
+            <a 
+              href="https://github.com/your-username/Unreal-MCP/releases/latest/download/UnrealMCP_Relay-Windows-x64.zip" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+            >
+              <Download className="w-5 h-5" /> Download .zip
             </a>
           </div>
           
@@ -39,13 +44,14 @@ export default function DownloadPage() {
         </div>
 
         <div className="text-left w-full max-w-2xl">
-          <h4 className="font-bold text-lg mb-4 flex items-center gap-2"><TerminalSquare className="w-5 h-5"/> Installation Instructions</h4>
-          <ol className="list-decimal list-inside text-gray-400 space-y-3">
-            <li>Download the <code>UnrealMCP_Relay.exe</code> file above.</li>
-            <li>Open your Unreal Engine project (Ensure Python Editor Script Plugin is enabled).</li>
-            <li>Double click the <code>.exe</code> file to start the relay.</li>
-            <li>Copy the secure Ngrok URL it generates.</li>
-            <li>Paste the URL into the <a href="/ide" className="text-blue-400 hover:underline">Web IDE Settings</a>.</li>
+          <h4 className="font-bold text-lg mb-4 flex items-center gap-2"><TerminalSquare className="w-5 h-5"/> How to Use (No Coding Required)</h4>
+          <ol className="list-decimal list-inside text-gray-400 space-y-3 text-sm leading-relaxed">
+            <li>Download the <code>UnrealMCP_Relay-Windows-x64.zip</code> file above.</li>
+            <li>Extract (unzip) the file. You will see <code>UnrealMCP_Relay.exe</code> inside.</li>
+            <li>Open your Unreal Engine project (Ensure <em>Python Editor Script Plugin</em> is enabled in Edit → Plugins).</li>
+            <li>Double-click <code>UnrealMCP_Relay.exe</code> to launch the app.</li>
+            <li>Copy the generated Ngrok URL shown in the window.</li>
+            <li>Paste the URL into the <a href="/ide" className="text-blue-400 hover:underline font-semibold">Web IDE Settings</a> and start prompting!</li>
           </ol>
         </div>
 
