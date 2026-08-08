@@ -5,7 +5,8 @@ import Link from "next/link";
 import { 
   Settings, ArrowLeft, Loader2, Send, Sparkles, 
   Terminal, CheckCircle2, AlertCircle, Bot, User, 
-  ChevronDown, ChevronUp, Copy, Check, Cpu, ShieldCheck
+  ChevronDown, ChevronUp, Copy, Check, Cpu, ShieldCheck,
+  Maximize2, Minus, X, Activity, Server, Radio
 } from "lucide-react";
 
 interface Message {
@@ -26,7 +27,7 @@ export default function IDEPage() {
   const [showAntigravityModal, setShowAntigravityModal] = useState(false);
   const [ngrokUrl, setNgrokUrl] = useState("http://localhost:8000/sse");
   const [apiKey, setApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState("antigravity-auto");
+  const [selectedModel, setSelectedModel] = useState("gpt-4o");
   const [prompt, setPrompt] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
@@ -36,7 +37,7 @@ export default function IDEPage() {
     {
       id: "1",
       sender: "assistant",
-      text: "Welcome to Unreal MCP AI Studio! I am your direct natural language assistant for Unreal Engine. Describe what you want to create or modify in your level, and I will execute it live in your editor.",
+      text: "Unreal MCP OS Environment Initialized. I am your direct AI Technical Artist for Unreal Engine 5. Enter any prompt below to manipulate your scene live.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -91,17 +92,16 @@ export default function IDEPage() {
     setIsProcessing(true);
     const assistantMsgId = (Date.now() + 1).toString();
 
-    // Add assistant thinking message with tool badge
     setMessages(prev => [
       ...prev,
       {
         id: assistantMsgId,
         sender: "assistant",
-        text: "Understanding prompt & orchestrating Unreal Engine scene...",
+        text: `Processing prompt via ${selectedModel.toUpperCase()}...`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         toolCall: {
           name: "execute_python_in_editor",
-          script: "# Executing instruction inside Unreal Engine...",
+          script: "# Generating & executing Python script in Unreal Engine...",
           status: "running"
         }
       }
@@ -114,6 +114,7 @@ export default function IDEPage() {
         body: JSON.stringify({
           url: ngrokUrl,
           prompt: userPromptText,
+          apiKey: apiKey,
           model: selectedModel
         })
       });
@@ -126,7 +127,7 @@ export default function IDEPage() {
             msg.id === assistantMsgId
               ? {
                   ...msg,
-                  text: `Successfully executed your request in Unreal Engine!`,
+                  text: data.explanation || "Successfully executed your request in Unreal Engine!",
                   toolCall: {
                     name: "execute_python_in_editor",
                     script: data.executedScript || `# Prompt: ${userPromptText}`,
@@ -143,10 +144,10 @@ export default function IDEPage() {
             msg.id === assistantMsgId
               ? {
                   ...msg,
-                  text: `❌ Could not complete request in Unreal Engine. Please check your connection.`,
+                  text: `❌ Could not complete request in Unreal Engine. Please check connection.`,
                   toolCall: {
                     name: "execute_python_in_editor",
-                    script: "# Attempted execution",
+                    script: data.executedScript || "# Attempted script",
                     output: data.error,
                     status: "error"
                   }
@@ -161,7 +162,7 @@ export default function IDEPage() {
           msg.id === assistantMsgId
             ? {
                 ...msg,
-                text: `❌ Connection Error: Ensure UnrealMCP_Relay.exe and Ngrok are running.`,
+                text: `❌ Relay Error: Ensure UnrealMCP_Relay.exe and Ngrok are active.`,
                 toolCall: {
                   name: "execute_python_in_editor",
                   script: "# Network failure",
@@ -178,60 +179,74 @@ export default function IDEPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#09090b] text-foreground overflow-hidden font-sans">
+    <div className="h-screen flex flex-col bg-[#0b0c10] text-[#c5c6c7] overflow-hidden font-mono border-t-2 border-blue-600 select-none">
       
-      {/* Top Navbar */}
-      <header className="h-14 flex justify-between items-center px-6 border-b border-white/10 glass sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
-            <ArrowLeft className="w-4 h-4" />
+      {/* Ubuntu / Enterprise OS Title Bar */}
+      <header className="h-10 flex justify-between items-center px-4 bg-[#1f2833] border-b border-white/10 text-xs z-20">
+        <div className="flex items-center gap-3">
+          {/* OS Window Controls */}
+          <div className="flex items-center gap-1.5 mr-2">
+            <div className="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-500 cursor-pointer transition-colors" />
+            <div className="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-500 cursor-pointer transition-colors" />
+            <div className="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-500 cursor-pointer transition-colors" />
+          </div>
+
+          <Link href="/" className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" />
           </Link>
-          <div className="font-bold text-base tracking-tight flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center font-extrabold text-white text-xs shadow-[0_0_12px_rgba(37,99,235,0.6)]">
+
+          <div className="font-semibold flex items-center gap-2 text-white">
+            <div className="w-4 h-4 rounded bg-blue-500 flex items-center justify-center font-black text-[10px] text-white">
               U
             </div>
-            <span>Unreal MCP AI Studio</span>
+            <span>Unreal Engine MCP Workstation OS</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Active Model Pill */}
+          <div className="hidden sm:flex items-center gap-1.5 bg-black/40 border border-blue-500/30 px-2.5 py-1 rounded text-[11px] text-blue-400">
+            <Radio className="w-3 h-3 animate-pulse text-blue-400" />
+            <span>MODEL: {selectedModel.toUpperCase()}</span>
+          </div>
+
           {/* Antigravity Integration Button */}
           <button
             onClick={() => setShowAntigravityModal(true)}
-            className="px-3 py-1.5 rounded-lg glass hover:bg-white/10 text-xs font-semibold text-purple-300 border border-purple-500/30 flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+            className="px-2.5 py-1 rounded bg-purple-900/40 hover:bg-purple-800/60 text-[11px] font-semibold text-purple-300 border border-purple-500/40 flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(168,85,247,0.2)]"
           >
             <Cpu className="w-3.5 h-3.5 text-purple-400" />
-            <span>Connect to Antigravity / Cursor</span>
+            <span>Connect Antigravity / Cursor</span>
           </button>
 
           {/* Connection Status Indicator */}
-          <div className="flex items-center gap-2 bg-black/50 border border-white/10 px-3 py-1.5 rounded-lg text-xs">
+          <div className="flex items-center gap-2 bg-black/50 border border-white/10 px-2.5 py-1 rounded text-[11px]">
             <span className={`w-2 h-2 rounded-full ${ngrokUrl ? "bg-green-400 animate-pulse" : "bg-yellow-500"}`} />
-            <span className="text-gray-300 font-mono text-[11px]">
-              {ngrokUrl ? "Relay Connected" : "No Tunnel"}
+            <span className="text-gray-300">
+              {ngrokUrl ? "RELAY LIVE" : "OFFLINE"}
             </span>
           </div>
 
-          {/* Settings Button */}
+          {/* Settings Toggle */}
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className={`p-2 rounded-lg transition-colors ${
-              showSettings ? "bg-white/15 text-white" : "text-gray-400 hover:bg-white/10 hover:text-white"
+            className={`p-1.5 rounded transition-colors ${
+              showSettings ? "bg-white/20 text-white" : "text-gray-400 hover:bg-white/10 hover:text-white"
             }`}
-            title="Settings"
+            title="System Settings"
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
 
       {/* Antigravity / Cursor Integration Modal */}
       {showAntigravityModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="glass-panel border border-white/15 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1f2833] border border-white/15 rounded-xl max-w-xl w-full p-6 shadow-2xl relative text-sans">
             <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
-              <h3 className="text-lg font-bold flex items-center gap-2 text-white">
-                <Cpu className="w-5 h-5 text-purple-400" /> Connect to Antigravity, Claude or Cursor
+              <h3 className="text-base font-bold flex items-center gap-2 text-white">
+                <Cpu className="w-5 h-5 text-purple-400" /> Antigravity & IDE Integration Setup
               </h3>
               <button 
                 onClick={() => setShowAntigravityModal(false)}
@@ -242,13 +257,13 @@ export default function IDEPage() {
             </div>
 
             <p className="text-xs text-gray-300 leading-relaxed mb-4">
-              To use Unreal MCP inside <strong>Antigravity</strong>, <strong>Claude Desktop</strong>, or <strong>Cursor IDE</strong>, simply add this configuration block to your tool settings:
+              To use this Unreal Engine MCP directly inside <strong>Antigravity</strong>, <strong>Claude Desktop</strong>, or <strong>Cursor IDE</strong>, add this JSON configuration:
             </p>
 
-            <div className="bg-black/90 p-4 rounded-xl border border-white/10 font-mono text-xs text-purple-300 relative mb-4">
+            <div className="bg-black/90 p-4 rounded-lg border border-white/10 font-mono text-xs text-purple-300 relative mb-4">
               <button
                 onClick={copyAntigravityConfig}
-                className="absolute top-3 right-3 p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-gray-300 transition-colors flex items-center gap-1 text-[11px]"
+                className="absolute top-3 right-3 p-1.5 rounded bg-white/10 hover:bg-white/20 text-gray-300 transition-colors flex items-center gap-1 text-[11px]"
               >
                 {copiedConfig ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                 {copiedConfig ? "Copied!" : "Copy JSON"}
@@ -264,13 +279,13 @@ export default function IDEPage() {
             </div>
 
             <div className="text-xs text-gray-400 space-y-2 mb-6">
-              <p>📍 <strong>Antigravity / Claude Desktop Path</strong>: <code>%APPDATA%/Claude/claude_desktop_config.json</code></p>
+              <p>📍 <strong>Antigravity / Claude Config Path</strong>: <code>%APPDATA%/Claude/claude_desktop_config.json</code></p>
               <p>📍 <strong>Cursor IDE</strong>: Settings → Features → MCP → Add Server (Type: <code>command</code>)</p>
             </div>
 
             <button
               onClick={() => setShowAntigravityModal(false)}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+              className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-xs transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]"
             >
               Done
             </button>
@@ -278,55 +293,68 @@ export default function IDEPage() {
         </div>
       )}
 
-      {/* Main Workspace Layout */}
+      {/* Main OS Workstation Body */}
       <div className="flex-1 flex overflow-hidden relative">
 
-        {/* Settings Panel */}
+        {/* System Settings Drawer */}
         {showSettings && (
-          <div className="absolute inset-y-0 right-0 w-80 glass-panel border-l border-white/15 p-6 z-30 shadow-2xl flex flex-col gap-6">
+          <div className="absolute inset-y-0 right-0 w-80 bg-[#1f2833] border-l border-white/15 p-6 z-30 shadow-2xl flex flex-col gap-6 text-sans">
             <div>
-              <h3 className="text-base font-bold mb-1 flex items-center gap-2">
-                <Settings className="w-4 h-4 text-blue-400" /> Connection Settings
+              <h3 className="text-sm font-bold mb-1 flex items-center gap-2 text-white">
+                <Settings className="w-4 h-4 text-blue-400" /> System & Model Settings
               </h3>
-              <p className="text-xs text-gray-400">Configure your local tunnel endpoint.</p>
+              <p className="text-xs text-gray-400">Configure LLM keys & Relay endpoints.</p>
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-300">Ngrok / Local Tunnel SSE URL</label>
+              <label className="text-xs font-medium text-gray-300">Ngrok / SSE Endpoint URL</label>
               <input
                 type="text"
                 placeholder="https://xxxx.ngrok.app/sse"
                 value={ngrokUrl}
                 onChange={e => setNgrokUrl(e.target.value)}
-                className="w-full bg-black/60 border border-white/15 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-500"
+                className="w-full bg-black/70 border border-white/15 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-500 text-white"
               />
-              <p className="text-[10px] text-gray-500">The URL shown in your running <code>UnrealMCP_Relay.exe</code> window.</p>
+              <p className="text-[10px] text-gray-500">The SSE tunnel URL generated by <code>UnrealMCP_Relay.exe</code>.</p>
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-medium text-gray-300">Model Engine</label>
+              <label className="text-xs font-medium text-gray-300">AI Model Provider</label>
               <select
                 value={selectedModel}
                 onChange={e => setSelectedModel(e.target.value)}
-                className="w-full bg-black/60 border border-white/15 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 text-gray-200"
+                className="w-full bg-black/70 border border-white/15 rounded px-3 py-2 text-xs focus:outline-none focus:border-blue-500 text-white"
               >
-                <option value="antigravity-auto">✨ Antigravity Auto Engine (Recommended)</option>
-                <option value="gpt-4o">OpenAI GPT-4o</option>
+                <option value="gpt-4o">OpenAI GPT-4o (Default Connected)</option>
+                <option value="gpt-4o-mini">OpenAI GPT-4o Mini (Fast)</option>
                 <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                <option value="groq-llama">Groq Llama 3.3 70B (Ultra Fast)</option>
               </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-gray-300">OpenAI / Groq API Key (Optional)</label>
+              <input
+                type="password"
+                placeholder="sk-... or gsk-..."
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                className="w-full bg-black/70 border border-white/15 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-blue-500 text-white"
+              />
+              <p className="text-[10px] text-gray-500">Passes directly to LLM endpoint. Leave empty to use system default engine.</p>
             </div>
 
             <button
               onClick={() => setShowSettings(false)}
-              className="mt-auto w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-bold transition-all"
+              className="mt-auto w-full py-2 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold text-white transition-all"
             >
-              Save Settings
+              Apply Settings
             </button>
           </div>
         )}
 
-        {/* Chat Feed */}
-        <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4 py-6">
+        {/* Central Terminal / Chat Stream */}
+        <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-6">
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
             {messages.map(msg => (
               <div
@@ -334,46 +362,60 @@ export default function IDEPage() {
                 className={`flex gap-4 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.sender === "assistant" && (
-                  <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 mt-1 shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                  <div className="w-8 h-8 rounded bg-blue-600/30 border border-blue-500/50 flex items-center justify-center text-blue-400 shrink-0 mt-1">
                     <Sparkles className="w-4 h-4" />
                   </div>
                 )}
 
-                <div className={`max-w-xl flex flex-col gap-2 ${msg.sender === "user" ? "items-end" : "items-start"}`}>
+                <div className={`max-w-2xl flex flex-col gap-2 ${msg.sender === "user" ? "items-end" : "items-start"}`}>
                   
-                  {/* Message Bubble */}
+                  {/* Text Bubble */}
                   <div
-                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    className={`px-4 py-3 rounded-lg text-xs leading-relaxed ${
                       msg.sender === "user"
                         ? "bg-blue-600 text-white font-medium rounded-tr-none shadow-[0_0_15px_rgba(37,99,235,0.3)]"
-                        : "glass-panel border border-white/10 text-gray-200 rounded-tl-none"
+                        : "bg-[#1f2833] border border-white/10 text-gray-200 rounded-tl-none"
                     }`}
                   >
                     {msg.text}
                   </div>
 
-                  {/* Clean Tool Execution Badge */}
+                  {/* Clean OS Tool Execution Badge */}
                   {msg.toolCall && (
-                    <div className="w-full glass rounded-xl border border-white/10 overflow-hidden text-xs mt-1">
-                      <div className="px-3.5 py-2.5 bg-black/40 flex items-center justify-between">
-                        <div className="flex items-center gap-2 font-mono text-xs">
+                    <div className="w-full bg-[#151c24] rounded border border-white/10 overflow-hidden text-xs mt-1">
+                      <div className="px-3.5 py-2 bg-black/40 flex items-center justify-between">
+                        <div className="flex items-center gap-2 font-mono text-[11px]">
                           {msg.toolCall.status === "running" && <Loader2 className="w-3.5 h-3.5 text-yellow-400 animate-spin" />}
                           {msg.toolCall.status === "success" && <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />}
                           {msg.toolCall.status === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
-                          <span className="text-gray-200 font-medium">⚡ Executing Unreal Engine Command</span>
+                          <span className="text-gray-300 font-bold">⚡ EXECUTING: {msg.toolCall.name}</span>
                         </div>
                         <button
                           onClick={() => toggleToolExpand(msg.id)}
-                          className="text-[11px] text-gray-400 hover:text-white flex items-center gap-1 font-mono"
+                          className="text-[10px] text-blue-400 hover:underline flex items-center gap-1 font-mono"
                         >
-                          {expandedTools[msg.id] ? "Hide Output" : "View Output"}
-                          {expandedTools[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          {expandedTools[msg.id] ? "[Hide Payload]" : "[Inspect Code & Log]"}
                         </button>
                       </div>
 
-                      {expandedTools[msg.id] && msg.toolCall.output && (
-                        <div className="p-3 bg-black/90 font-mono text-[11px] border-t border-white/10 text-green-400 overflow-x-auto whitespace-pre-wrap">
-                          {msg.toolCall.output}
+                      {expandedTools[msg.id] && (
+                        <div className="p-3 bg-black/90 font-mono text-[11px] border-t border-white/10 space-y-2">
+                          {msg.toolCall.script && (
+                            <div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Generated Python:</div>
+                              <pre className="p-2 bg-black rounded text-blue-300 text-[10px] overflow-x-auto whitespace-pre-wrap">
+                                {msg.toolCall.script}
+                              </pre>
+                            </div>
+                          )}
+                          {msg.toolCall.output && (
+                            <div>
+                              <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Unreal Engine Stdout:</div>
+                              <pre className="p-2 bg-black rounded text-green-400 text-[10px] overflow-x-auto whitespace-pre-wrap">
+                                {msg.toolCall.output}
+                              </pre>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -383,7 +425,7 @@ export default function IDEPage() {
                 </div>
 
                 {msg.sender === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-white/10 border border-white/15 flex items-center justify-center text-gray-300 shrink-0 mt-1">
+                  <div className="w-8 h-8 rounded bg-white/10 border border-white/15 flex items-center justify-center text-gray-300 shrink-0 mt-1">
                     <User className="w-4 h-4" />
                   </div>
                 )}
@@ -392,34 +434,46 @@ export default function IDEPage() {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Bottom Prompt Bar */}
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <div className="relative glass-panel rounded-2xl border border-white/20 focus-within:border-blue-500/60 transition-all p-2 flex items-center gap-3 shadow-2xl">
+          {/* Bottom OS Command Prompt Bar */}
+          <div className="mt-4 pt-3 border-t border-white/10">
+            <div className="relative bg-[#1f2833] rounded-lg border border-white/20 focus-within:border-blue-500/80 transition-all p-2 flex items-center gap-3">
+              <span className="text-blue-400 text-xs font-bold pl-2">unreal-mcp &gt;</span>
               <input
                 type="text"
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSendPrompt()}
-                placeholder="Ask Unreal MCP (e.g., 'Spawn a point light at 0,0,200' or 'Set directional light color to blue')..."
-                className="flex-1 bg-transparent px-3 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none"
+                placeholder="Enter prompt (e.g. 'Spawn 3 point lights in a row' or 'Create a CineCameraActor')..."
+                className="flex-1 bg-transparent px-2 py-2 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
               />
               <button
                 onClick={handleSendPrompt}
                 disabled={isProcessing || !prompt.trim()}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(37,99,235,0.5)]"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded font-bold text-xs flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]"
               >
-                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                <span>Send</span>
+                {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>EXECUTE</span>
               </button>
             </div>
-            <div className="flex justify-between items-center px-2 mt-2 text-[11px] text-gray-500 font-mono">
-              <span>Model: ✨ Antigravity Auto Engine</span>
-              <span>Zero-Code Prompt Mode</span>
+            <div className="flex justify-between items-center px-2 mt-2 text-[10px] text-gray-500 font-mono">
+              <span>CONNECTED ENGINE: {selectedModel.toUpperCase()}</span>
+              <span>UNREAL ENGINE 5 LIVE BRIDGE</span>
             </div>
           </div>
         </div>
 
       </div>
+
+      {/* OS Bottom Status Bar */}
+      <footer className="h-6 bg-[#1f2833] border-t border-white/10 px-4 flex justify-between items-center text-[10px] text-gray-400">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5"><Activity className="w-3 h-3 text-green-400" /> SYSTEM ACTIVE</span>
+          <span className="flex items-center gap-1.5"><Server className="w-3 h-3 text-blue-400" /> PORT 8000</span>
+        </div>
+        <div>
+          <span>UNREAL MCP PRO WORKSTATION v1.0</span>
+        </div>
+      </footer>
     </div>
   );
 }
